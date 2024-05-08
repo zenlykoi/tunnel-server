@@ -34,6 +34,10 @@ const argv = optimist
 	.options('password', {
 		describe: 'Basic auth password',
 	})
+  .options('multi-agents', {
+    default: false,
+		describe: 'Multiple agents mode enabled',
+	})
 	.argv;
 
 if (argv.help) {
@@ -48,7 +52,8 @@ const server = CreateServer({
   auth: (argv.username && argv.password) ? {
     username: argv.username,
     password: argv.password
-  } : null
+  } : null,
+  multiAgents: argv['multi-agents']
 });
 
 server.listen(argv.port, argv.address, () => {

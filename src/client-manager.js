@@ -23,6 +23,8 @@ class ClientManager {
 
     // This is totally wrong :facepalm: this needs to be per-client...
     this.graceTimeout = null;
+
+    this.multiAgents = opt.multiAgents;
   }
 
   // create a new tunnel with `id`
@@ -32,6 +34,10 @@ class ClientManager {
     const clients = this.clients;
     const stats = this.stats;
     const maxSockets = this.opt.max_tcp_sockets;
+
+    if (!this.multiAgents && clients[id]) {
+      id = hri.random();
+    }
 
     // can't ask for id already is use
     if (!clients[id]) {

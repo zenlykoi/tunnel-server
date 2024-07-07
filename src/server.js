@@ -1,15 +1,10 @@
-const log = require('book');
 const Koa = require('koa');
 const koaBasicAuth = require('koa-basic-auth');
 const tldjs = require('tldjs');
-const Debug = require('debug');
 const http = require('http');
 const { hri } = require('human-readable-ids');
 const Router = require('koa-router');
-
 const ClientManager = require('./client-manager');
-
-const debug = Debug('localtunnel:server');
 
 function CreateServer (opt) {
   opt = opt || {};
@@ -64,7 +59,6 @@ function CreateServer (opt) {
     const isNewClientRequest = ctx.query['new'] !== undefined;
     if (isNewClientRequest) {
       const reqId = hri.random();
-      debug('making new client with id %s', reqId);
       const info = await manager.newClient(reqId);
 
       const url = schema + '://' + info.id + '.' + ctx.request.host;
@@ -102,7 +96,6 @@ function CreateServer (opt) {
       return;
     }
 
-    debug('making new client with id %s', reqId);
     const info = await manager.newClient(reqId);
 
     const url = schema + '://' + info.id + '.' + ctx.request.host;

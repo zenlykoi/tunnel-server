@@ -1,8 +1,7 @@
 const { hri } = require('human-readable-ids');
-const Debug = require('debug');
-
 const Client = require('./client');
 const TunnelAgent = require('./tunnel-agent');
+const logger = require('./logger');
 
 // Manage sets of clients
 //
@@ -18,8 +17,6 @@ class ClientManager {
     this.stats = {
       tunnels: 0
     };
-
-    this.debug = Debug('lt:ClientManager');
 
     // This is totally wrong :facepalm: this needs to be per-client...
     this.graceTimeout = null;
@@ -42,6 +39,7 @@ class ClientManager {
     // can't ask for id already is use
     if (!clients[id]) {
       clients[id] = new Client(id);
+      logger.info(`[client-manager] created new client: ${id}`);
 
       clients[id].once('close', () => {
         this.removeClient(id);
@@ -73,7 +71,6 @@ class ClientManager {
   }
 
   removeClient(id) {
-    this.debug('removing client: %s', id);
     const client = this.clients[id];
     if (!client) {
       return;
@@ -81,6 +78,7 @@ class ClientManager {
     --this.stats.tunnels;
     delete this.clients[id];
     client.close();
+    logger.info(`[client-manager] removed client: ${id}`);
   }
 
   hasClient(id) {

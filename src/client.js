@@ -1,7 +1,10 @@
 const http = require('http');
-const Debug = require('debug');
 const pump = require('pump');
 const EventEmitter = require('events');
+const logger = require('./logger');
+
+const HEARTBEAT_INTERVAL = 10 * 1000;
+const HEARTBEAT_TIMEOUT = 60 * 1000;
 
 // A client encapsulates req/res handling using an agent
 //
@@ -14,7 +17,6 @@ class Client extends EventEmitter {
     this.agents = [];
     this.currentAgentIndex = 0;
     this.id = id;
-    this.debug = Debug(`lt:Client[${this.id}]`);
   }
 
   get agent() {
@@ -25,31 +27,75 @@ class Client extends EventEmitter {
 
   addAgent(agent) {
     let graceTimeout;
-    const agentIndex = this.agents.length;
+
+    agent.isAlive = true;
+    agent.lastPing = Date.now();
 
     this.agents.push(agent);
 
+    logger.info(`[client] (${this.id}) added new agent: ${this.agents.length}`);
+
+    const sendPing = () => {
+      agent.createConnection({}, (err, conn) => {
+        if (err) {
+          return;
+        }
+
+        conn.write('ping');
+        logger.info(`[client] agent (${agent.tcpPort}) ping`);
+      });
+    }
+
+    const pingInterval = setInterval(() => {
+      if (Date.now() - agent.lastPing > HEARTBEAT_TIMEOUT) {
+        logger.warn(`[client] agent (${agent.tcpPort}) heartbeat timeout`);
+        close();
+        clearInterval(pingInterval);
+        return;
+      }
+
+      sendPing();
+    }, HEARTBEAT_INTERVAL);
+
+    agent.on('pong', () => {
+      agent.isAlive = true;
+      agent.lastPing = Date.now();
+      logger.info(`[client] agent (${agent.tcpPort}) received pong`);
+    });
+
     const close = () => {
+      if (agent.closed) {
+        return;
+      }
+
+      clearInterval(pingInterval);
       clearTimeout(graceTimeout);
       agent.destroy();
-      this.agents.splice(agentIndex, 1);
+      const index = this.agents.findIndex(ag => ag.port == agent.tcpPort);
+
+      if (index < 0) {
+        logger.error(`[client] (${this.id}) - agent (${agent.tcpPort}) remove error`);
+      }
+
+      this.agents.splice(index, 1);
+
+      logger.info(`[client] (${this.id}) removed agent (${agent.tcpPort}), remainning: ${this.agents.length}`);
 
       if (this.agents.length == 0) {
         this.emit('close');
       }
     };
+
     // client is given a grace period in which they can connect before they are _removed_
     graceTimeout = setTimeout(() => {
       close();
     }, 1000).unref();
 
     agent.on('online', () => {
-      this.debug('client online %s', this.id);
       clearTimeout(graceTimeout);
     });
 
     agent.on('offline', () => {
-      this.debug('client offline %s', this.id);
 
       // if there was a previous timeout set, we don't want to double trigger
       clearTimeout(graceTimeout);
@@ -77,10 +123,10 @@ class Client extends EventEmitter {
     }
     
     this.emit('close');
+    logger.info(`[client] (${this.id}) closed`);
   }
 
   handleRequest(req, res) {
-    this.debug('> %s', req.url);
     const opt = {
       path: req.url,
       agent: this.agent,
@@ -89,7 +135,6 @@ class Client extends EventEmitter {
     };
 
     const clientReq = http.request(opt, (clientRes) => {
-      this.debug('< %s', req.url);
       // write response code and headers
       res.writeHead(clientRes.statusCode, clientRes.headers);
 
@@ -109,7 +154,6 @@ class Client extends EventEmitter {
   }
 
   handleUpgrade(req, socket) {
-    this.debug('> [up] %s', req.url);
     socket.once('error', (err) => {
       // These client side errors can happen if the client dies while we are reading
       // We don't need to surface these in our logs.
@@ -120,7 +164,6 @@ class Client extends EventEmitter {
     });
 
     this.agent.createConnection({}, (err, conn) => {
-      this.debug('< [up] %s', req.url);
       // any errors getting a connection mean we cannot service this request
       if (err) {
         socket.end();

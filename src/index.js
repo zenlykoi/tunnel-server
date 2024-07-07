@@ -1,11 +1,6 @@
 const optimist = require('optimist');
-
-const log = require('book');
-const Debug = require('debug');
-
 const CreateServer = require('./server');
-
-const debug = Debug('localtunnel');
+const logger = require('./logger');
 
 const argv = optimist
 	.usage('Usage: $0 --port [num]')
@@ -57,7 +52,7 @@ const server = CreateServer({
 });
 
 server.listen(argv.port, argv.address, () => {
-	console.log('server listening on port: %d', server.address().port);
+	logger.info(`Server listening on port: ${server.address().port}`);
 });
 
 process.on('SIGINT', () => {
@@ -69,9 +64,9 @@ process.on('SIGTERM', () => {
 });
 
 process.on('uncaughtException', (err) => {
-	log.error(err);
+	logger.error(err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-	log.error(reason);
+	logger.error(reason);
 });

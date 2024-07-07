@@ -19,9 +19,5 @@ Rebuild from [Localtunnel Server](https://github.com/localtunnel/server)
 Deploy using docker
 
 ```
-docker run -d \
-    --restart always \
-    --name tunnel-server \
-    --net host \
-    nguyenphuong99/tunnel-server:latest --port 1234 --domain domain.vn --secure true --multi-agents true
+docker run -d --restart always --name tunnel-server --net host nguyenphuong99/tunnel-server:latest --port 1234 --domain domain.vn --secure true --multi-agents true
 ```
